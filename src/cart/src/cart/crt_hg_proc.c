@@ -51,11 +51,11 @@ crt_proc_get_op(crt_proc_t proc, crt_proc_op_t *proc_op)
 	hg_proc_op_t	hg_proc_op;
 	int		rc = 0;
 
-	if (proc == NULL) {
+	if (unlikely(proc == NULL)) {
 		D_ERROR("Proc is not initilalized.\n");
 		D_GOTO(out, rc = -DER_INVAL);
 	}
-	if (proc_op == NULL) {
+	if (unlikely(proc_op == NULL)) {
 		D_ERROR("invalid parameter - NULL proc_op.\n");
 		D_GOTO(out, rc = -DER_INVAL);
 	}
@@ -83,114 +83,242 @@ out:
 int
 crt_proc_memcpy(crt_proc_t proc, void *data, size_t data_size)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	void		*buf;
 
-	hg_ret = hg_proc_memcpy(proc, data, data_size);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, data_size);
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		memcpy(buf, data, data_size);
+		break;
+	case CRT_PROC_DECODE:
+		memcpy(data, buf, data_size);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_int8_t(crt_proc_t proc, int8_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	int8_t		*buf;
 
-	hg_ret = hg_proc_int8_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_uint8_t(crt_proc_t proc, uint8_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	uint8_t		*buf;
 
-	hg_ret = hg_proc_uint8_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_int16_t(crt_proc_t proc, int16_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	int16_t		*buf;
 
-	hg_ret = hg_proc_int16_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_uint16_t(crt_proc_t proc, uint16_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	uint16_t	*buf;
 
-	hg_ret = hg_proc_uint16_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_int32_t(crt_proc_t proc, int32_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	int32_t		*buf;
 
-	hg_ret = hg_proc_int32_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_uint32_t(crt_proc_t proc, uint32_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	uint32_t	*buf;
 
-	hg_ret = hg_proc_uint32_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_int64_t(crt_proc_t proc, int64_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	int64_t		*buf;
 
-	hg_ret = hg_proc_int64_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+
 }
 
 int
 crt_proc_uint64_t(crt_proc_t proc, uint64_t *data)
 {
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	uint64_t	*buf;
 
-	hg_ret = hg_proc_uint64_t(proc, data);
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
 crt_proc_bool(crt_proc_t proc, bool *data)
 {
-	hg_bool_t	hg_bool;
-	hg_return_t	hg_ret;
+	crt_proc_op_t	proc_op;
+	bool		*buf;
 
-	hg_bool = (*data == false) ? 0 : 1;
-	hg_ret = hg_proc_hg_bool_t(proc, &hg_bool);
-	*data = (hg_bool == 0) ? false : true;
+	if (unlikely(crt_proc_get_op(proc, &proc_op)))
+		return -DER_HG;
 
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
-}
+	buf = hg_proc_save_ptr(proc, sizeof(*buf));
+	switch (proc_op) {
+	case CRT_PROC_ENCODE:
+		*buf = *data;
+		break;
+	case CRT_PROC_DECODE:
+		*data = *buf;
+		break;
+	default:
+		break;
+	}
 
-int
-crt_proc_raw(crt_proc_t proc, void *buf, size_t buf_size)
-{
-	hg_return_t	hg_ret;
-
-	hg_ret = hg_proc_raw(proc, buf, buf_size);
-
-	return (hg_ret == HG_SUCCESS) ? 0 : -DER_HG;
+	return 0;
 }
 
 int
@@ -332,8 +460,7 @@ crt_proc_d_iov_t(crt_proc_t proc, d_iov_t *div)
 		return -DER_HG;
 
 	if (proc_op == CRT_PROC_FREE) {
-		if (div->iov_buf_len > 0)
-			D_FREE(div->iov_buf);
+		div->iov_buf = NULL;
 		div->iov_buf_len = 0;
 		div->iov_len = 0;
 		return 0;
@@ -352,24 +479,21 @@ crt_proc_d_iov_t(crt_proc_t proc, d_iov_t *div)
 			div->iov_buf_len, div->iov_len);
 		return -DER_HG;
 	}
-	if (proc_op == CRT_PROC_DECODE) {
-		if (div->iov_buf_len > 0) {
-			D_ALLOC(div->iov_buf, div->iov_buf_len);
-			if (div->iov_buf == NULL)
-				return -DER_NOMEM;
-		} else {
-			div->iov_buf = NULL;
-		}
-	}
 
-	rc = crt_proc_memcpy(proc, div->iov_buf, div->iov_len);
-	if (rc != 0) {
-		if (proc_op == CRT_PROC_DECODE) {
-			D_FREE(div->iov_buf);
-			div->iov_buf_len = 0;
-			div->iov_len = 0;
+	if (proc_op == CRT_PROC_DECODE) {
+		if (div->iov_buf_len == 0) {
+			div->iov_buf = NULL;
+		} else {
+			/**
+			 * Don't allocate/memcpy like we do for others.
+			 * Just point at memory in request buffer instead.
+			 */
+			div->iov_buf = hg_proc_save_ptr(proc, div->iov_len);
 		}
-		return -DER_HG;
+	} else {
+		rc = crt_proc_memcpy(proc, div->iov_buf, div->iov_len);
+		if (rc != 0)
+			return -DER_HG;
 	}
 
 	return 0;
