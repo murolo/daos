@@ -14,7 +14,11 @@ post_provision_config_nodes() {
     #fi
 
     # remove to avoid conflicts
-    zypper --non-interactive rm python2-Fabric Modules
+    if ! zypper --non-interactive rm python2-Fabric Modules && \
+       [ ${PIPESTATUS[0]} -ne 104 ]; then
+        echo "Failed to remove packages"
+        exit 1
+    fi
     zypper --non-interactive in avocado patch python2-Jinja2 pciutils lua-lmod
 
     if [ -n "$DAOS_STACK_GROUP_REPO" ]; then
