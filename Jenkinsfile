@@ -888,7 +888,7 @@ pipeline {
                       expression { ! skip_stage('run_test') }
                     }
                     agent {
-                        label 'ci_vm1'
+                        label 'stage_vm1'
                     }
                     steps {
                         provisionNodes NODELIST: env.NODELIST,
@@ -1070,7 +1070,7 @@ pipeline {
                         expression { ! skip_stage('func-test-leap15') }
                     }
                     agent {
-                        label 'ci_vm9'
+                        label 'stage_vm9'
                     }
                     steps {
                         provisionNodes NODELIST: env.NODELIST,
@@ -1109,7 +1109,7 @@ pipeline {
                     }
                     agent {
                         // 2 node cluster with 1 IB/node + 1 test control node
-                        label 'ci_nvme3'
+                        label 'stage_nvme3'
                     }
                     steps {
                         provisionNodes NODELIST: env.NODELIST,
@@ -1223,7 +1223,7 @@ pipeline {
                         }
                     }
                     agent {
-                        label 'ci_vm1'
+                        label 'stage_vm1'
                     }
                     steps {
                         testRpm inst_repos: el7_daos_repos(),
@@ -1241,7 +1241,7 @@ pipeline {
                         }
                     }
                     agent {
-                        label 'ci_vm1'
+                        label 'stage_vm1'
                     }
                     steps {
                         testRpm inst_repos: el7_daos_repos(),
