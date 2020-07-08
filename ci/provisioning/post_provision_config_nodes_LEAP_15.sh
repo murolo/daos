@@ -48,6 +48,13 @@ post_provision_config_nodes() {
             zypper --non-interactive ar --gpgcheck-allow-unsigned "${JENKINS_URL}"job/daos-stack/job/"${repo}"/job/"${branch//\//%252F}"/"${build_number}"/artifact/artifacts/leap15/ "$repo"
         done
     fi
+    # need to remove ipmctl since 15.2 has 2.0 and 15.1 only had 1.0
+    if ! zypper --non-interactive rm ipmctl && \
+       [ ${PIPESTATUS[0]} -ne 104 ]; then
+        echo "Failed to remove packages"
+        exit 1
+    fi
+
     #if [ -n "$INST_RPMS" ]; then
         #yum -y erase $INST_RPMS
     #fi
