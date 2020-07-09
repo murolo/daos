@@ -132,9 +132,8 @@ daos_lru_cache_create(int bits, uint32_t feats,
 		D_GOTO(out, rc = -DER_NOMEM);
 
 	rc = d_hash_table_create_inplace(feats | D_HASH_FT_LRU,
-					 max(4, bits - 3),
-					 NULL, &lru_ops,
-					 &lcache->dlc_htable);
+					 (uint32_t)max_t(int, 4, bits - 3),
+					 NULL, &lru_ops, &lcache->dlc_htable);
 	if (rc)
 		D_GOTO(out, rc);
 
@@ -178,8 +177,13 @@ lru_evict_cb(d_list_t *link, void *arg)
 	struct daos_llink *llink = link2llink(link);
 	struct lru_evict_arg *cb_arg = arg;
 
-	if (cb_arg->cb == NULL || cb_arg->cb(llink, cb_arg->arg))
-		d_list_add(&llink->ll_qlink, &cb_arg->list);
+	if (llink->ll_evicted || cb_arg->cb == NULL ||
+	    cb_arg->cb(llink, cb_arg->arg)) {
+		llink->ll_evicted = 1;
+		if (d_list_empty(&llink->ll_qlink))
+			d_list_add(&llink->ll_qlink, &cb_arg->list);
+	}
+
 	return 0;
 }
 
@@ -199,25 +203,17 @@ daos_lru_cache_evict(struct daos_lru_cache *lcache,
 
 	d_list_for_each_entry_safe(llink, tmp, &cb_arg.list, ll_qlink) {
 		d_list_del_init(&llink->ll_qlink);
-		if (llink->ll_ref == 1) {
+		if (llink->ll_ref == 1) { /* the last refcount */
 			D_DEBUG(DB_TRACE, "Remove %p from LRU cache\n",
 				llink);
 			d_hash_rec_delete_at(&lcache->dlc_htable,
 					     &llink->ll_link);
 			lcache->dlc_count--;
 			count++;
-		} else {
-			if (!llink->ll_evicted) {
-				/*
-				 * will be evicted later
-				 * in daos_lru_ref_release
-				 */
-				daos_lru_ref_evict(lcache, llink);
-				count++;
-			}
 		}
 	}
-	D_DEBUG(DB_TRACE, "Evicted %u items\n", count);
+	D_DEBUG(DB_TRACE, "Evicted %u items, total count %u of %u\n",
+		count, lcache->dlc_count, lcache->dlc_csize);
 }
 
 int
@@ -265,13 +261,10 @@ out:
 static bool
 lru_flush_cond(struct daos_llink *llink, void *arg)
 {
-	bool evict = false;
-
-	if (llink->ll_ref < 2) {
+	if (llink->ll_ref == 1) /* the last refcount */
 		llink->ll_evicted = 1;
-		evict = true;
-	}
-	return evict;
+
+	return llink->ll_evicted;
 }
 
 void
