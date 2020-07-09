@@ -25,6 +25,7 @@ post_provision_config_nodes() {
          # rm -f /etc/yum.repos.d/*"$DAOS_STACK_GROUP_REPO"
         zypper --non-interactive ar "$REPOSITORY_URL"/"$DAOS_STACK_GROUP_REPO" daos-stack-group-repo
         zypper --non-interactive mr --gpgcheck-allow-unsigned-repo daos-stack-group-repo
+        rpm --import 'https://download.opensuse.org/repositories/science:/HPC/openSUSE_Leap_15.2/repodata/repomd.xml.key'
         zypper --non-interactive --gpg-auto-import-keys --no-gpg-checks ref daos-stack-group-repo
     fi
     
