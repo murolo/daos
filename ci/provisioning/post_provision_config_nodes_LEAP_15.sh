@@ -49,7 +49,6 @@ post_provision_config_nodes() {
             zypper --non-interactive ar --gpgcheck-allow-unsigned "${JENKINS_URL}"job/daos-stack/job/"${repo}"/job/"${branch//\//%252F}"/"${build_number}"/artifact/artifacts/leap15/ "$repo"
         done
     fi
-    zypper --non-interactive lr
     # need to remove ipmctl since 15.2 has 2.0 and 15.1 only had 1.0
     if ! zypper --non-interactive rm ipmctl && \
        [ ${PIPESTATUS[0]} -ne 104 ]; then
@@ -60,8 +59,8 @@ post_provision_config_nodes() {
     #if [ -n "$INST_RPMS" ]; then
         #yum -y erase $INST_RPMS
     #fi
-    if ! zypper --non-interactive in ed nfs-client sudo nfs-kernel-server \
-                                     python3-clustershell $INST_RPMS; then
+    if ! zypper --non-interactive in ed nfs-client nfs-kernel-server \
+                                     python2-clustershell $INST_RPMS; then
         rc=${PIPESTATUS[0]}
         for file in /etc/zypp/repos.d/*.repo; do
             echo "---- $file ----"
