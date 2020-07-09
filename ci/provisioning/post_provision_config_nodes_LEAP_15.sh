@@ -19,7 +19,7 @@ post_provision_config_nodes() {
         echo "Failed to remove packages"
         exit 1
     fi
-    zypper --non-interactive in avocado patch python2-Jinja2 pciutils lua-lmod
+    zypper --non-interactive in python2-Jinja2 lua-lmod
 
     if [ -n "$DAOS_STACK_GROUP_REPO" ]; then
          # rm -f /etc/yum.repos.d/*"$DAOS_STACK_GROUP_REPO"
@@ -59,6 +59,13 @@ post_provision_config_nodes() {
     #if [ -n "$INST_RPMS" ]; then
         #yum -y erase $INST_RPMS
     #fi
+    # no suitable (python2) avocado package can be found
+    zypper --non-interactive ar --gpgcheck-allow-unsigned \
+           'https://build.hpdd.intel.com/job/daos-stack/job/python-avocado/job/PR-1/lastSuccessfulBuild/artifact/artifacts/leap15/' avocado
+    zypper --non-interactive --gpg-auto-import-keys ref avocado
+    zypper --non-interactive in python2-avocado-plugins-varianter-yaml-to-mux \
+                                python2-avocado-plugins-output-html           \
+
     if ! zypper --non-interactive in ed nfs-client nfs-kernel-server \
                                      python2-clustershell $INST_RPMS; then
         rc=${PIPESTATUS[0]}
