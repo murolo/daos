@@ -48,11 +48,6 @@ post_provision_config_nodes() {
             zypper --non-interactive ar --gpgcheck-allow-unsigned "${JENKINS_URL}"job/daos-stack/job/"${repo}"/job/"${branch//\//%252F}"/"${build_number}"/artifact/artifacts/leap15/ "$repo"
         done
     fi
-    # need 15.1 repos for transition to 15.2
-    zypper --non-interactive ar http://download.opensuse.org/distribution/leap/15.1/repo/oss/ leap15.1-oss
-    # need to hack in 15.2 science:HPC repo as a test
-    zypper --non-interactive ar https://download.opensuse.org/repositories/science:/HPC/openSUSE_Leap_15.2/ science-hpc
-    zypper --non-interactive --gpg-auto-import-keys ref leap15.1-oss science-hpc
     zypper --non-interactive lr
     # need to remove ipmctl since 15.2 has 2.0 and 15.1 only had 1.0
     if ! zypper --non-interactive rm ipmctl && \
