@@ -1082,7 +1082,6 @@ pipeline {
                                        inst_rpms: get_daos_packages('leap15') + ' ' +
                                                   leap15_functional_rpms + ' ' +
                                                   qb_inst_rpms_functional()
-                        update_kernel(9)
                         runTestFunctional stashes: [ 'leap15-gcc-install',
                                                      'leap15-gcc-build-vars' ],
                                           test_rpms: env.TEST_RPMS,
