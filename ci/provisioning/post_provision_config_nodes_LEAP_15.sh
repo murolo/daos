@@ -65,7 +65,7 @@ post_provision_config_nodes() {
         #yum -y erase $INST_RPMS
     #fi
     if ! zypper --non-interactive in ed nfs-client sudo nfs-kernel-server \
-                                     $INST_RPMS; then
+                                     python3-clustershell $INST_RPMS; then
         rc=${PIPESTATUS[0]}
         for file in /etc/zypp/repos.d/*.repo; do
             echo "---- $file ----"
