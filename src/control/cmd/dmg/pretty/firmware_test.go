@@ -133,12 +133,12 @@ host1
     Active Version: V100
     Staged Version: V101
     Maximum Firmware Image Size: 12 KiB
-    Update Status: Staged
+    Last Update Status: Staged
   UID:Device2 PhysicalID:2 Capacity:66 KiB Location:(socket:6 memctrlr:7 chan:8 pos:9)
     Active Version: A113
     Staged Version: N/A
     Maximum Firmware Image Size: 53 KiB
-    Update Status: Success
+    Last Update Status: Success
   UID:Device3 PhysicalID:3 Capacity:66 KiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
     Error querying firmware: test error
   UID:Device4 PhysicalID:4 Capacity:66 KiB Location:(socket:2 memctrlr:2 chan:2 pos:1)
@@ -211,7 +211,7 @@ host1
     Active Version: B300
     Staged Version: N/A
     Maximum Firmware Image Size: 1.0 MiB
-    Update Status: Failed
+    Last Update Status: Failed
 -----
 host2
 -----
@@ -224,7 +224,7 @@ host2
     Active Version: A113
     Staged Version: N/A
     Maximum Firmware Image Size: 2.0 MiB
-    Update Status: Unknown
+    Last Update Status: Unknown
 `,
 		},
 	} {
