@@ -37,6 +37,12 @@ import (
 	"github.com/daos-stack/daos/src/control/lib/txtfmt"
 )
 
+const (
+	scmUpdateSuccess = "Success - The new firmware was staged. A reboot is required to apply."
+	scmNotFound      = "No SCM devices detected"
+	errorPrefix      = "Error"
+)
+
 func getPrintVersion(version string) string {
 	if version == "" {
 		return "N/A"
@@ -56,7 +62,7 @@ func PrintSCMFirmwareQueryMap(fwMap control.HostSCMQueryMap, out io.Writer,
 
 		iw := txtfmt.NewIndentWriter(out)
 		if len(fwResults) == 0 {
-			fmt.Fprintln(iw, "No SCM devices detected")
+			fmt.Fprintln(iw, scmNotFound)
 			continue
 		}
 
@@ -69,12 +75,12 @@ func PrintSCMFirmwareQueryMap(fwMap control.HostSCMQueryMap, out io.Writer,
 			iw1 := txtfmt.NewIndentWriter(iw)
 
 			if res.Error != nil {
-				fmt.Fprintf(iw1, "Error querying firmware: %s\n", res.Error.Error())
+				fmt.Fprintf(iw1, "%s: %s\n", errorPrefix, res.Error.Error())
 				continue
 			}
 
 			if res.Info == nil {
-				fmt.Fprint(iw1, "Error: No information available\n")
+				fmt.Fprintf(iw1, "%s: No information available\n", errorPrefix)
 				continue
 			}
 
@@ -88,8 +94,9 @@ func PrintSCMFirmwareQueryMap(fwMap control.HostSCMQueryMap, out io.Writer,
 	return w.Err
 }
 
-// PrintSCMFirmwareUpdateMap formats the firmware query results for human readability.
-func PrintSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
+// PrintSCMFirmwareUpdateMapVerbose formats the firmware query results in a
+// detailed format.
+func PrintSCMFirmwareUpdateMapVerbose(fwMap control.HostSCMUpdateMap, out io.Writer,
 	opts ...control.PrintConfigOption) error {
 	w := txtfmt.NewErrWriter(out)
 
@@ -100,7 +107,7 @@ func PrintSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
 
 		iw := txtfmt.NewIndentWriter(out)
 		if len(fwResults) == 0 {
-			fmt.Fprintln(iw, "No SCM devices detected")
+			fmt.Fprintln(iw, scmNotFound)
 			continue
 		}
 
@@ -113,11 +120,11 @@ func PrintSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
 			iw1 := txtfmt.NewIndentWriter(iw)
 
 			if res.Error != nil {
-				fmt.Fprintf(iw1, "Error updating firmware: %s\n", res.Error.Error())
+				fmt.Fprintf(iw1, "%s: %s\n", errorPrefix, res.Error.Error())
 				continue
 			}
 
-			fmt.Fprint(iw1, "Success - The new firmware was staged. A reboot is required to apply.\n")
+			fmt.Fprintf(iw1, "%s\n", scmUpdateSuccess)
 		}
 	}
 
@@ -129,27 +136,39 @@ type hostDeviceSet struct {
 	devices []string
 }
 
-func (h hostDeviceSet) addHostDevice(host string, device string) {
-	if h.hosts == nil {
-		h.hosts = hostlist.CreateSet("")
-	}
-	if d.devices == nil {
-		h.devices = make([]string)
-	}
+func (h hostDeviceSet) addHost(host string) {
 	h.hosts.Insert(host)
+}
+
+func (h hostDeviceSet) addDevice(device string) {
 	h.devices = append(h.devices, device)
 }
 
-type hostDeviceResultMap map[string]hostDeviceSet
-
-func (m hostDeviceMap) add(resultStr string, host string, device string) {
-	if _, ok := m[resultStr]; !ok {
-		m[resultStr] = hostDeviceSet{}
+func newHostDeviceSet() (*hostDeviceSet, error) {
+	h := &hostDeviceSet{}
+	hosts, err := hostlist.CreateSet("")
+	if err != nil {
+		return nil, err
 	}
-	m[resultStr].addHostDevice(host, device)
+	h.hosts = hosts
+	h.devices = make([]string, 0)
+	return h, nil
 }
 
-func (m hostDeviceMap) Keys() []string {
+type hostDeviceResultMap map[string]*hostDeviceSet
+
+func (m hostDeviceResultMap) addResult(resultStr string) error {
+	if _, ok := m[resultStr]; !ok {
+		newSet, err := newHostDeviceSet()
+		if err != nil {
+			return err
+		}
+		m[resultStr] = *newSet
+	}
+	return nil
+}
+
+func (m hostDeviceResultMap) Keys() []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -158,24 +177,46 @@ func (m hostDeviceMap) Keys() []string {
 	return keys
 }
 
-func condenseSCMUpdateMap(fwMap control.HostSCMUpdateMap) hostDeviceResultMap {
+func condenseSCMUpdateMap(fwMap control.HostSCMUpdateMap) (hostDeviceResultMap, error) {
 	condensed := make(hostDeviceResultMap)
 	for _, host := range fwMap.Keys() {
 		results := fwMap[host]
-		for _, devRes := range results {
-			resultStr := "Success - The new firmware was staged. A reboot is required to apply."
-			if devRes.Error != nil {
-				resultStr = fmt.Sprintf("Error updating firmware: %s\n", devRes.Error.Error())
+
+		if len(results) == 0 {
+			err := condensed.addResult(scmNotFound)
+			if err != nil {
+				return nil, err
 			}
-			m.add(resultStr, host, devRes.Module.String())
+			condensed[scmNotFound].addHost(host)
+			continue
 		}
+
+		for _, devRes := range results {
+			resultStr := scmUpdateSuccess
+			if devRes.Error != nil {
+				resultStr = fmt.Sprintf("%s: %s\n", errorPrefix, devRes.Error.Error())
+			}
+
+			err := condensed.addResult(resultStr)
+			if err != nil {
+				return nil, err
+			}
+			condensed[resultStr].addHost(host)
+			condensed[resultStr].addDevice(devRes.Module.String())
+		}
+
 	}
-	return condensed
+	return condensed, nil
 }
 
-func PrintCondensedSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
+// PrintSCMFirmwareUpdateMap prints the update results in a condensed format.
+func PrintSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
 	opts ...control.PrintConfigOption) error {
-	condensed := condenseSCMUpdateMap(fwMap)
+	condensed, err := condenseSCMUpdateMap(fwMap)
+	if err != nil {
+		return err
+	}
+
 	w := txtfmt.NewErrWriter(out)
 
 	for _, result := range condensed.Keys() {
@@ -188,17 +229,12 @@ func PrintCondensedSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.W
 		fmt.Fprintf(out, "%s\n%s\n%s\n", lineBreak, hosts, lineBreak)
 
 		iw := txtfmt.NewIndentWriter(out)
-		if len(set.devices) == 0 {
-			fmt.Fprintln(iw, "No SCM devices detected")
-			continue
-		}
-
-		for _, dev := range set.devices {
-			fmt.Fprintln(iw, dev)
-		}
+		fmt.Fprintln(iw, result)
 
 		iw2 := txtfmt.NewIndentWriter(iw)
-		fmt.Fprintln(iw2, result)
+		for _, dev := range set.devices {
+			fmt.Fprintln(iw2, dev)
+		}
 	}
 
 	return w.Err

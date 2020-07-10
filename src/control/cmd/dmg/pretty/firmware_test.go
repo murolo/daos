@@ -140,7 +140,7 @@ host1
     Maximum Firmware Image Size: 53 KiB
     Last Update Status: Success
   UID:Device3 PhysicalID:3 Capacity:66 KiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
-    Error querying firmware: test error
+    Error: test error
   UID:Device4 PhysicalID:4 Capacity:66 KiB Location:(socket:2 memctrlr:2 chan:2 pos:1)
     Error: No information available
 `,
@@ -219,7 +219,7 @@ host2
     Active Version: N/A
     Staged Version: N/A
     Maximum Firmware Image Size: 0 B
-    Update Status: Unknown
+    Last Update Status: Unknown
   UID:Device3 PhysicalID:3 Capacity:4.0 GiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
     Active Version: A113
     Staged Version: N/A
@@ -241,7 +241,7 @@ host2
 	}
 }
 
-func TestPretty_PrintSCMFirmwareUpdateMap(t *testing.T) {
+func TestPretty_PrintSCMFirmwareUpdateMapVerbose(t *testing.T) {
 	for name, tc := range map[string]struct {
 		fwMap       control.HostSCMUpdateMap
 		hostErrors  control.HostErrorsMap
@@ -250,10 +250,15 @@ func TestPretty_PrintSCMFirmwareUpdateMap(t *testing.T) {
 		"no devices": {
 			fwMap: control.HostSCMUpdateMap{
 				"host1": []*control.SCMUpdateResult{},
+				"host2": []*control.SCMUpdateResult{},
 			},
 			expPrintStr: `
 -----
 host1
+-----
+  No SCM devices detected
+-----
+host2
 -----
   No SCM devices detected
 `,
@@ -304,7 +309,7 @@ host1
   UID:Device1 PhysicalID:1 Capacity:12 KiB Location:(socket:1 memctrlr:2 chan:3 pos:5)
     Success - The new firmware was staged. A reboot is required to apply.
   UID:Device2 PhysicalID:2 Capacity:66 KiB Location:(socket:6 memctrlr:7 chan:8 pos:9)
-    Error updating firmware: test error
+    Error: test error
   UID:Device3 PhysicalID:3 Capacity:66 KiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
     Success - The new firmware was staged. A reboot is required to apply.
 `,
@@ -362,7 +367,147 @@ host2
   UID:Device2 PhysicalID:2 Capacity:1.0 GiB Location:(socket:6 memctrlr:7 chan:8 pos:9)
     Success - The new firmware was staged. A reboot is required to apply.
   UID:Device3 PhysicalID:3 Capacity:4.0 GiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
-    Error updating firmware: something went wrong
+    Error: something went wrong
+`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var bld strings.Builder
+			if err := PrintSCMFirmwareUpdateMapVerbose(tc.fwMap, &bld); err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(strings.TrimLeft(tc.expPrintStr, "\n"), bld.String()); diff != "" {
+				t.Fatalf("unexpected format string (-want, +got):\n%s\n", diff)
+			}
+		})
+	}
+}
+
+func TestPretty_PrintSCMFirmwareUpdateMap(t *testing.T) {
+	for name, tc := range map[string]struct {
+		fwMap       control.HostSCMUpdateMap
+		hostErrors  control.HostErrorsMap
+		expPrintStr string
+	}{
+		"no devices": {
+			fwMap: control.HostSCMUpdateMap{
+				"host1": []*control.SCMUpdateResult{},
+				"host2": []*control.SCMUpdateResult{},
+			},
+			expPrintStr: `
+---------
+host[1-2]
+---------
+  No SCM devices detected
+`,
+		},
+		"single host": {
+			fwMap: control.HostSCMUpdateMap{
+				"host1": []*control.SCMUpdateResult{
+					{
+						Module: storage.ScmModule{
+							UID:             "Device1",
+							PhysicalID:      1,
+							Capacity:        12345,
+							SocketID:        1,
+							ControllerID:    2,
+							ChannelID:       3,
+							ChannelPosition: 5,
+						},
+					},
+					{
+						Module: storage.ScmModule{
+							UID:             "Device2",
+							PhysicalID:      2,
+							Capacity:        67890,
+							SocketID:        6,
+							ControllerID:    7,
+							ChannelID:       8,
+							ChannelPosition: 9,
+						},
+						Error: errors.New("test error"),
+					},
+					{
+						Module: storage.ScmModule{
+							UID:             "Device3",
+							PhysicalID:      3,
+							Capacity:        67890,
+							SocketID:        1,
+							ControllerID:    2,
+							ChannelID:       2,
+							ChannelPosition: 1,
+						},
+					},
+				},
+			},
+			expPrintStr: `
+-----
+host1
+-----
+  Error: test error
+    UID:Device2 PhysicalID:2 Capacity:66 KiB Location:(socket:6 memctrlr:7 chan:8 pos:9)
+-----
+host1
+-----
+  Success - The new firmware was staged. A reboot is required to apply.
+    UID:Device1 PhysicalID:1 Capacity:12 KiB Location:(socket:1 memctrlr:2 chan:3 pos:5)
+    UID:Device3 PhysicalID:3 Capacity:66 KiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
+`,
+		},
+		"multiple hosts": {
+			fwMap: control.HostSCMUpdateMap{
+				"host1": []*control.SCMUpdateResult{
+					{
+						Module: storage.ScmModule{
+							UID:             "Device1",
+							PhysicalID:      1,
+							Capacity:        (1 << 31),
+							SocketID:        1,
+							ControllerID:    2,
+							ChannelID:       3,
+							ChannelPosition: 5,
+						},
+					},
+				},
+				"host2": []*control.SCMUpdateResult{
+					{
+						Module: storage.ScmModule{
+							UID:             "Device2",
+							PhysicalID:      2,
+							Capacity:        (1 << 30),
+							SocketID:        6,
+							ControllerID:    7,
+							ChannelID:       8,
+							ChannelPosition: 9,
+						},
+					},
+					{
+						Module: storage.ScmModule{
+							UID:             "Device3",
+							PhysicalID:      3,
+							Capacity:        (1 << 32),
+							SocketID:        1,
+							ControllerID:    2,
+							ChannelID:       2,
+							ChannelPosition: 1,
+						},
+						Error: errors.New("something went wrong"),
+					},
+				},
+			},
+			expPrintStr: `
+-----
+host2
+-----
+  Error: something went wrong
+    UID:Device3 PhysicalID:3 Capacity:4.0 GiB Location:(socket:1 memctrlr:2 chan:2 pos:1)
+---------
+host[1-2]
+---------
+  Success - The new firmware was staged. A reboot is required to apply.
+    UID:Device1 PhysicalID:1 Capacity:2.0 GiB Location:(socket:1 memctrlr:2 chan:3 pos:5)
+    UID:Device2 PhysicalID:2 Capacity:1.0 GiB Location:(socket:6 memctrlr:7 chan:8 pos:9)
 `,
 		},
 	} {
