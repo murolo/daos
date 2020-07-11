@@ -35,6 +35,7 @@ import (
 	"github.com/daos-stack/daos/src/control/lib/control"
 	"github.com/daos-stack/daos/src/control/lib/hostlist"
 	"github.com/daos-stack/daos/src/control/lib/txtfmt"
+	"github.com/daos-stack/daos/src/control/server/storage"
 )
 
 const (
@@ -50,8 +51,8 @@ func getPrintVersion(version string) string {
 	return version
 }
 
-// PrintSCMFirmwareQueryMap formats the firmware query results for human readability.
-func PrintSCMFirmwareQueryMap(fwMap control.HostSCMQueryMap, out io.Writer,
+// PrintSCMFirmwareQueryMapVerbose formats the firmware query results in a detailed format.
+func PrintSCMFirmwareQueryMapVerbose(fwMap control.HostSCMQueryMap, out io.Writer,
 	opts ...control.PrintConfigOption) error {
 	w := txtfmt.NewErrWriter(out)
 
@@ -79,22 +80,87 @@ func PrintSCMFirmwareQueryMap(fwMap control.HostSCMQueryMap, out io.Writer,
 				continue
 			}
 
-			if res.Info == nil {
-				fmt.Fprintf(iw1, "%s: No information available\n", errorPrefix)
-				continue
-			}
-
-			fmt.Fprintf(iw1, "Active Version: %s\n", getPrintVersion(res.Info.ActiveVersion))
-			fmt.Fprintf(iw1, "Staged Version: %s\n", getPrintVersion(res.Info.StagedVersion))
-			fmt.Fprintf(iw1, "Maximum Firmware Image Size: %s\n", humanize.IBytes(uint64(res.Info.ImageMaxSizeBytes)))
-			fmt.Fprintf(iw1, "Last Update Status: %s\n", res.Info.UpdateStatus)
+			printSCMFirmwareInfo(res.Info, iw1)
 		}
 	}
 
 	return w.Err
 }
 
-// PrintSCMFirmwareUpdateMapVerbose formats the firmware query results in a
+func printSCMFirmwareInfo(info *storage.ScmFirmwareInfo, out io.Writer) {
+	if info == nil {
+		fmt.Fprintf(out, "%s: No information available\n", errorPrefix)
+		return
+	}
+
+	fmt.Fprintf(out, "Active Version: %s\n", getPrintVersion(info.ActiveVersion))
+	fmt.Fprintf(out, "Staged Version: %s\n", getPrintVersion(info.StagedVersion))
+	fmt.Fprintf(out, "Maximum Firmware Image Size: %s\n", humanize.IBytes(uint64(info.ImageMaxSizeBytes)))
+	fmt.Fprintf(out, "Last Update Status: %s\n", info.UpdateStatus)
+}
+
+func condenseSCMQueryMap(fwMap control.HostSCMQueryMap) (hostDeviceResultMap, error) {
+	condensed := make(hostDeviceResultMap)
+	for _, host := range fwMap.Keys() {
+		results := fwMap[host]
+		if len(results) == 0 {
+			err := condensed.AddHost(scmNotFound, host)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		for _, devRes := range results {
+			var resultStr string
+			if devRes.Error != nil {
+				resultStr = fmt.Sprintf("%s: %s", errorPrefix, devRes.Error.Error())
+			} else {
+				var b strings.Builder
+				printSCMFirmwareInfo(devRes.Info, &b)
+				resultStr = b.String()
+			}
+
+			err := condensed.AddHostDevice(resultStr, host, devRes.Module.String())
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return condensed, nil
+}
+
+// PrintSCMFirmwareQueryMap formats the firmware query results in a condensed format.
+func PrintSCMFirmwareQueryMap(fwMap control.HostSCMQueryMap, out io.Writer,
+	opts ...control.PrintConfigOption) error {
+	condensed, err := condenseSCMQueryMap(fwMap)
+	if err != nil {
+		return err
+	}
+
+	w := txtfmt.NewErrWriter(out)
+	for _, result := range condensed.Keys() {
+		set, ok := condensed[result]
+		if !ok {
+			continue
+		}
+		hosts := control.GetPrintHosts(set.Hosts.RangedString(), opts...)
+		lineBreak := strings.Repeat("-", len(hosts))
+		fmt.Fprintf(out, "%s\n%s\n%s\n", lineBreak, hosts, lineBreak)
+
+		iw := txtfmt.NewIndentWriter(out)
+		fmt.Fprintln(iw, result)
+
+		iw2 := txtfmt.NewIndentWriter(iw)
+		for _, dev := range set.Devices {
+			fmt.Fprintln(iw2, dev)
+		}
+	}
+
+	return w.Err
+}
+
+// PrintSCMFirmwareUpdateMapVerbose formats the firmware update results in a
 // detailed format.
 func PrintSCMFirmwareUpdateMapVerbose(fwMap control.HostSCMUpdateMap, out io.Writer,
 	opts ...control.PrintConfigOption) error {
@@ -131,40 +197,50 @@ func PrintSCMFirmwareUpdateMapVerbose(fwMap control.HostSCMUpdateMap, out io.Wri
 	return w.Err
 }
 
-type hostDeviceSet struct {
-	hosts   *hostlist.HostSet
-	devices []string
+type HostDeviceSet struct {
+	Hosts   *hostlist.HostSet
+	Devices []string
 }
 
-func (h hostDeviceSet) addHost(host string) {
-	h.hosts.Insert(host)
+func (h *HostDeviceSet) AddHost(host string) {
+	h.Hosts.Insert(host)
 }
 
-func (h hostDeviceSet) addDevice(device string) {
-	h.devices = append(h.devices, device)
+func (h *HostDeviceSet) AddDevice(device string) {
+	h.Devices = append(h.Devices, device)
 }
 
-func newHostDeviceSet() (*hostDeviceSet, error) {
-	h := &hostDeviceSet{}
+func newHostDeviceSet() (*HostDeviceSet, error) {
 	hosts, err := hostlist.CreateSet("")
 	if err != nil {
 		return nil, err
 	}
-	h.hosts = hosts
-	h.devices = make([]string, 0)
-	return h, nil
+	return &HostDeviceSet{
+		Hosts: hosts,
+	}, nil
 }
 
-type hostDeviceResultMap map[string]*hostDeviceSet
+type hostDeviceResultMap map[string]*HostDeviceSet
 
-func (m hostDeviceResultMap) addResult(resultStr string) error {
+func (m hostDeviceResultMap) AddHostDevice(resultStr string, host string, device string) error {
+	err := m.AddHost(resultStr, host)
+	if err != nil {
+		return err
+	}
+	m[resultStr].AddDevice(device)
+	return nil
+}
+
+func (m hostDeviceResultMap) AddHost(resultStr string, host string) error {
 	if _, ok := m[resultStr]; !ok {
 		newSet, err := newHostDeviceSet()
 		if err != nil {
 			return err
 		}
-		m[resultStr] = *newSet
+		m[resultStr] = newSet
 	}
+
+	m[resultStr].AddHost(host)
 	return nil
 }
 
@@ -181,30 +257,25 @@ func condenseSCMUpdateMap(fwMap control.HostSCMUpdateMap) (hostDeviceResultMap, 
 	condensed := make(hostDeviceResultMap)
 	for _, host := range fwMap.Keys() {
 		results := fwMap[host]
-
 		if len(results) == 0 {
-			err := condensed.addResult(scmNotFound)
+			err := condensed.AddHost(scmNotFound, host)
 			if err != nil {
 				return nil, err
 			}
-			condensed[scmNotFound].addHost(host)
 			continue
 		}
 
 		for _, devRes := range results {
 			resultStr := scmUpdateSuccess
 			if devRes.Error != nil {
-				resultStr = fmt.Sprintf("%s: %s\n", errorPrefix, devRes.Error.Error())
+				resultStr = fmt.Sprintf("%s: %s", errorPrefix, devRes.Error.Error())
 			}
 
-			err := condensed.addResult(resultStr)
+			err := condensed.AddHostDevice(resultStr, host, devRes.Module.String())
 			if err != nil {
 				return nil, err
 			}
-			condensed[resultStr].addHost(host)
-			condensed[resultStr].addDevice(devRes.Module.String())
 		}
-
 	}
 	return condensed, nil
 }
@@ -224,7 +295,7 @@ func PrintSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
 		if !ok {
 			continue
 		}
-		hosts := control.GetPrintHosts(set.hosts.RangedString(), opts...)
+		hosts := control.GetPrintHosts(set.Hosts.RangedString(), opts...)
 		lineBreak := strings.Repeat("-", len(hosts))
 		fmt.Fprintf(out, "%s\n%s\n%s\n", lineBreak, hosts, lineBreak)
 
@@ -232,7 +303,7 @@ func PrintSCMFirmwareUpdateMap(fwMap control.HostSCMUpdateMap, out io.Writer,
 		fmt.Fprintln(iw, result)
 
 		iw2 := txtfmt.NewIndentWriter(iw)
-		for _, dev := range set.devices {
+		for _, dev := range set.Devices {
 			fmt.Fprintln(iw2, dev)
 		}
 	}
