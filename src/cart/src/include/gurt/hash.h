@@ -243,14 +243,14 @@ union d_hash_lock {
 
 struct d_hash_bucket {
 	d_list_t		hb_head;
-	/** different type of locks based on ht_feats */
-	union d_hash_lock	hb_lock;
 #if D_HASH_DEBUG
 	unsigned int		hb_dep;
 #endif
 };
 
 struct d_hash_table {
+	/** different type of locks based on ht_feats */
+	union d_hash_lock	 ht_lock;
 	/** bits to generate number of buckets */
 	uint32_t		 ht_bits;
 	/** feature bits */
@@ -270,7 +270,7 @@ struct d_hash_table {
 	/** array of buckets */
 	struct d_hash_bucket	*ht_buckets;
 	/** different type of locks based on ht_feats */
-	union d_hash_lock	 ht_lock;
+	union d_hash_lock	*ht_blocks;
 };
 
 /**
